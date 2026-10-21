@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太陽の見かけの公転と地球の公転（3D視点＆公転完全連動シミュレーター）</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: #151c2c;
+            --accent-color: #3b82f6;
+            --sun-color: #fbbf24;
+            --earth-color: #38bdf8;
+            --ecliptic-color: #f97316;
+            --equator-color: #a855f7;
+            --text-color: #f3f4f6;
+            --text-sub: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 12px 20px;
+            border-bottom: 1px solid #2d3748;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 12px;
+            height: calc(100vh - 180px);
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+                overflow-y: auto;
+            }
+        }
+
+        .view-panel {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            border: 1px solid #2d3748;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .panel-title {
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .panel-title span {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-sub);
+            font-weight: normal;
+        }
+
+        .canvas-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+        }
+
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: none;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        .control-bar {
+            background-color: var(--panel-bg);
+            border-top: 1px solid #2d3748;
+            padding: 12px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-row label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            min-width: 60px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #374151;
+            border-radius: 3px;
+            outline: none;
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .date-display {
+            background: #0b0f19;
+            border: 1px solid #374151;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: var(--sun-color);
+            min-width: 110px;
+            text-align: center;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #1f2937;
+            color: #f3f4f6;
+            border: 1px solid #374151;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background: #374151;
+            border-color: #4b5563;
+        }
+
+        button.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        .info-pills {
+            display: flex;
+            gap: 12px;
+            margin-left: auto;
+            font-size: 0.8rem;
+        }
+
+        .pill {
+            background: #0b0f19;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #2d3748;
+        }
+
+        .pill span {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .sync-notice {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>
+            太陽運動・地球公転 連動シミュレーター
+            <span class="badge">視点＆日付 100%双方向同期</span>
+        </h1>
+        <button id="resetCamBtn">📷 視点アングルリセット</button>
+    </header>
+
+    <div class="main-container">
+        <!-- 左画面：ヘリオセントリック（宇宙目線） -->
+        <div class="view-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    1. 地球の公転モデル
+                    <span>宇宙視点（太陽中心 / ヘリオセントリック）</span>
+                </div>
+            </div>
+            <div class="sync-notice">⇄ 3D視点ドラッグ連動中</div>
+            <div class="canvas-container" id="container1">
+                <canvas id="canvas1"></canvas>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background: var(--sun-color);"></div>太陽（中心）</div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--earth-color);"></div>地球（公転＋地軸23.4°傾斜）</div>
+                <div class="legend-item"><div class="legend-color" style="background: #ef4444;"></div>地軸（北極方向）</div>
+            </div>
+        </div>
+
+        <!-- 右画面：ジオセントリック（天球目線） -->
+        <div class="view-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    2. 見かけの太陽運動
+                    <span>地球視点（天球モデル / ジオセントリック）</span>
+                </div>
+            </div>
+            <div class="sync-notice">⇄ 3D視点ドラッグ連動中</div>
+            <div class="canvas-container" id="container2">
+                <canvas id="canvas2"></canvas>
+            </div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background: var(--earth-color);"></div>地球（中心）</div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--ecliptic-color);"></div>黄道（太陽の見かけの通り道）</div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--equator-color);"></div>天の赤道</div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--sun-color);"></div>見かけの太陽</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下部コントロールバー -->
+    <div class="control-bar">
+        <div class="slider-row">
+            <label for="dateSlider">日時（1年）</label>
+            <input type="range" id="dateSlider" min="0" max="364" value="80" step="1">
+            <div class="date-display" id="dateDisplay">3月21日</div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div class="btn-group">
+                <button id="playBtn">▶ 再生</button>
+                <span style="color: #4b5563;">|</span>
+                <button class="season-btn" data-day="80">春分 (3/21)</button>
+                <button class="season-btn" data-day="172">夏至 (6/21)</button>
+                <button class="season-btn" data-day="265">秋分 (9/23)</button>
+                <button class="season-btn" data-day="355">冬至 (12/22)</button>
+            </div>
+
+            <div class="info-pills">
+                <div class="pill">地球公転角: <span id="orbitAngleVal">0°</span></div>
+                <div class="pill">太陽赤緯（傾き）: <span id="declinationVal">0°</span></div>
+                <div class="pill">季節: <span id="seasonVal">春分</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 定数および状態変数 ---
+        const AXIS_TILT = 23.44 * (Math.PI / 180); // 地軸の傾き（ラジアン）
+        
+        let currentDay = 80; // 春分付近スタート (0 ~ 364)
+        let isPlaying = false;
+        let animFrameId = null;
+
+        // 共有3Dカメラ設定（どちらの画面を操作してもこの角度が共通適用される）
+        let camera = {
+            pitch: 0.35,  // X軸回転 (上下)
+            yaw: -0.6,    // Y軸回転 (左右)
+            distance: 350
+        };
+
+        // UIエレメント
+        const canvas1 = document.getElementById('canvas1');
+        const canvas2 = document.getElementById('canvas2');
+        const ctx1 = canvas1.getContext('2d');
+        const ctx2 = canvas2.getContext('2d');
+
+        const container1 = document.getElementById('container1');
+        const container2 = document.getElementById('container2');
+
+        const dateSlider = document.getElementById('dateSlider');
+        const dateDisplay = document.getElementById('dateDisplay');
+        const playBtn = document.getElementById('playBtn');
+        const resetCamBtn = document.getElementById('resetCamBtn');
+        const seasonBtns = document.querySelectorAll('.season-btn');
+
+        const orbitAngleVal = document.getElementById('orbitAngleVal');
+        const declinationVal = document.getElementById('declinationVal');
+        const seasonVal = document.getElementById('seasonVal');
+
+        // --- 純粋数学：3D透視投影エンジン ---
+        function rotateX(p, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: p.x,
+                y: p.y * cos - p.z * sin,
+                z: p.y * sin + p.z * cos
+            };
+        }
+
+        function rotateY(p, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: p.x * cos + p.z * sin,
+                y: p.y,
+                z: -p.x * sin + p.z * cos
+            };
+        }
+
+        function project(p, width, height) {
+            // カメラ回転適用 (Yaw -> Pitch)
+            let pRot = rotateY(p, camera.yaw);
+            pRot = rotateX(pRot, camera.pitch);
+
+            // 透視投影 (Perspective Projection)
+            const fov = 400;
+            const scale = fov / (fov + pRot.z + camera.distance);
+            
+            return {
+                x: width / 2 + pRot.x * scale,
+                y: height / 2 - pRot.y * scale, // Y軸反転
+                z: pRot.z,
+                scale: scale
+            };
+        }
+
+        // キャンバスサイズ自動調整
+        function resizeCanvases() {
+            [ {c: canvas1, parent: container1}, {c: canvas2, parent: container2} ].forEach(item => {
+                const rect = item.parent.getBoundingClientRect();
+                item.c.width = rect.width * window.devicePixelRatio;
+                item.c.height = rect.height * window.devicePixelRatio;
+            });
+            render();
+        }
+
+        // --- ドラッグによる視点回転操作（両画面で共通制御） ---
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        function handlePointerDown(e) {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY };
+        }
+
+        function handlePointerMove(e) {
+            if (!isDragging) return;
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            if (clientX === undefined || clientY === undefined) return;
+
+            const deltaX = clientX - previousMousePosition.x;
+            const deltaY = clientY - previousMousePosition.y;
+
+            // カメラアングル更新
+            camera.yaw += deltaX * 0.008;
+            camera.pitch += deltaY * 0.008;
+
+            // Pitch限界制御
+            camera.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, camera.pitch));
+
+            previousMousePosition = { x: clientX, y: clientY };
+            render();
+        }
+
+        function handlePointerUp() {
+            isDragging = false;
+        }
+
+        // イベントリスナー登録 (両方のコンテナに登録して同一動作を達成)
+        [container1, container2].forEach(container => {
+            container.addEventListener('mousedown', handlePointerDown);
+            container.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+
+            container.addEventListener('touchstart', handlePointerDown, {passive: true});
+            container.addEventListener('touchmove', handlePointerMove, {passive: true});
+            window.addEventListener('touchend', handlePointerUp);
+        });
+
+        resetCamBtn.addEventListener('click', () => {
+            camera.pitch = 0.35;
+            camera.yaw = -0.6;
+            render();
+        });
+
+        // --- レンダリング処理 ---
+        function render() {
+            // 天体角度計算
+            // 春分（Day 80付近）を基準とした角度
+            const lambda = ((currentDay - 80) / 365) * Math.PI * 2; // 公転・見かけの黄道経度
+            
+            // 赤緯（Declination）: sin(δ) = sin(ε) * sin(λ)
+            const decRads = Math.asin(Math.sin(AXIS_TILT) * Math.sin(lambda));
+            const decDeg = (decRads * (180 / Math.PI)).toFixed(1);
+
+            // 情報UI更新
+            updateUI(lambda, decDeg);
+
+            // 1. 左画面描画 (公転モデル)
+            drawHeliocentric(lambda);
+
+            // 2. 右画面描画 (天球モデル)
+            drawGeocentric(lambda);
+        }
+
+        // UI表示の更新
+        function drawHeliocentric(lambda) {
+            const w = canvas1.width;
+            const h = canvas1.height;
+            ctx1.clearRect(0, 0, w, h);
+
+            const R = Math.min(w, h) * 0.28; // 軌道半径
+
+            // グリッド平面（参照用）
+            drawGrid(ctx1, w, h, 200, 5);
+
+            // 1. 公転軌道 (円)
+            ctx1.beginPath();
+            ctx1.strokeStyle = '#334155';
+            ctx1.lineWidth = 1.5;
+            for (let i = 0; i <= 64; i++) {
+                const ang = (i / 64) * Math.PI * 2;
+                const p = project({ x: R * Math.cos(ang), y: 0, z: R * Math.sin(ang) }, w, h);
+                if (i === 0) ctx1.moveTo(p.x, p.y);
+                else ctx1.lineTo(p.x, p.y);
+            }
+            ctx1.stroke();
+
+            // 季節マーカー (春分・夏至・秋分・冬至)
+            const seasons = [
+                { angle: 0, label: '春分' },
+                { angle: Math.PI / 2, label: '夏至' },
+                { angle: Math.PI, label: '秋分' },
+                { angle: Math.PI * 1.5, label: '冬至' }
+            ];
+            seasons.forEach(s => {
+                const pt = project({ x: R * Math.cos(s.angle), y: 0, z: R * Math.sin(s.angle) }, w, h);
+                ctx1.fillStyle = '#64748b';
+                ctx1.font = `${10 * window.devicePixelRatio}px sans-serif`;
+                ctx1.fillText(s.label, pt.x + 8, pt.y + 4);
+            });
+
+            // 2. 太陽（中心）
+            const sunP = project({ x: 0, y: 0, z: 0 }, w, h);
+            const sunGlow = ctx1.createRadialGradient(sunP.x, sunP.y, 2, sunP.x, sunP.y, 20 * sunP.scale);
+            sunGlow.addColorStop(0, '#fef08a');
+            sunGlow.addColorStop(0.4, '#fbbf24');
+            sunGlow.addColorStop(1, 'transparent');
+            ctx1.fillStyle = sunGlow;
+            ctx1.beginPath();
+            ctx1.arc(sunP.x, sunP.y, 20 * sunP.scale, 0, Math.PI * 2);
+            ctx1.fill();
+
+            // 3. 地球の位置
+            const earthPos = {
+                x: R * Math.cos(lambda),
+                y: 0,
+                z: R * Math.sin(lambda)
+            };
+            const earthP = project(earthPos, w, h);
+
+            // 太陽-地球を結ぶ光線
+            ctx1.beginPath();
+            ctx1.setLineDash([4, 4]);
+            ctx1.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+            ctx1.moveTo(sunP.x, sunP.y);
+            ctx1.lineTo(earthP.x, earthP.y);
+            ctx1.stroke();
+            ctx1.setLineDash([]);
+
+            // 地球球体
+            ctx1.fillStyle = '#38bdf8';
+            ctx1.beginPath();
+            ctx1.arc(earthP.x, earthP.y, 10 * earthP.scale, 0, Math.PI * 2);
+            ctx1.fill();
+
+            // 4. 地軸（23.4°傾斜：X軸方向に固定傾斜）
+            const tiltLen = 35;
+            const axisVec = {
+                x: tiltLen * Math.sin(AXIS_TILT),
+                y: tiltLen * Math.cos(AXIS_TILT),
+                z: 0
+            };
+            
+            const pNorth = project({ x: earthPos.x + axisVec.x, y: earthPos.y + axisVec.y, z: earthPos.z + axisVec.z }, w, h);
+            const pSouth = project({ x: earthPos.x - axisVec.x, y: earthPos.y - axisVec.y, z: earthPos.z - axisVec.z }, w, h);
+
+            ctx1.beginPath();
+            ctx1.strokeStyle = '#ef4444'; // 地軸（赤）
+            ctx1.lineWidth = 2.5;
+            ctx1.moveTo(pSouth.x, pSouth.y);
+            ctx1.lineTo(pNorth.x, pNorth.y);
+            ctx1.stroke();
+
+            // 北極ラベル
+            ctx1.fillStyle = '#fca5a5';
+            ctx1.font = `bold ${11 * window.devicePixelRatio}px sans-serif`;
+            ctx1.fillText('N', pNorth.x + 5, pNorth.y);
+        }
+
+        // 地球目線（天球モデル）の描画
+        function drawGeocentric(lambda) {
+            const w = canvas2.width;
+            const h = canvas2.height;
+            ctx2.clearRect(0, 0, w, h);
+
+            const R = Math.min(w, h) * 0.28; // 天球半径
+
+            // 1. 地球（中心）
+            const earthP = project({ x: 0, y: 0, z: 0 }, w, h);
+            ctx2.fillStyle = '#38bdf8';
+            ctx2.beginPath();
+            ctx2.arc(earthP.x, earthP.y, 12 * earthP.scale, 0, Math.PI * 2);
+            ctx2.fill();
+
+            // 地球の自転軸 (垂直から23.4°傾斜または天球座標で垂直)
+            // ここでは理解しやすいよう、天球の赤道を水平、地軸を垂直として天球を描画
+            const pNorth = project({ x: 0, y: R * 1.1, z: 0 }, w, h);
+            const pSouth = project({ x: 0, y: -R * 1.1, z: 0 }, w, h);
+            ctx2.beginPath();
+            ctx2.strokeStyle = '#ef4444';
+            ctx2.lineWidth = 1.5;
+            ctx2.setLineDash([3, 3]);
+            ctx2.moveTo(pSouth.x, pSouth.y);
+            ctx2.lineTo(pNorth.x, pNorth.y);
+            ctx2.stroke();
+            ctx2.setLineDash([]);
+
+            // 2. 天球ワイヤーフレーム（球体ガイド）
+            ctx2.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx2.lineWidth = 1;
+            for (let lat = -60; lat <= 60; lat += 30) {
+                const rad = lat * Math.PI / 180;
+                const rLat = R * Math.cos(rad);
+                const yLat = R * Math.sin(rad);
+                ctx2.beginPath();
+                for (let i = 0; i <= 36; i++) {
+                    const lon = (i / 36) * Math.PI * 2;
+                    const p = project({ x: rLat * Math.cos(lon), y: yLat, z: rLat * Math.sin(lon) }, w, h);
+                    if (i === 0) ctx2.moveTo(p.x, p.y);
+                    else ctx2.lineTo(p.x, p.y);
+                }
+                ctx2.stroke();
+            }
+
+            // 3. 天の赤道 (Celestial Equator: 水平面)
+            ctx2.beginPath();
+            ctx2.strokeStyle = '#a855f7';
+            ctx2.lineWidth = 2;
+            for (let i = 0; i <= 64; i++) {
+                const ang = (i / 64) * Math.PI * 2;
+                const p = project({ x: R * Math.cos(ang), y: 0, z: R * Math.sin(ang) }, w, h);
+                if (i === 0) ctx2.moveTo(p.x, p.y);
+                else ctx2.lineTo(p.x, p.y);
+            }
+            ctx2.stroke();
+
+            // 4. 黄道 (Ecliptic: 赤道に対して23.4°傾いた大円)
+            ctx2.beginPath();
+            ctx2.strokeStyle = '#f97316';
+            ctx2.lineWidth = 2.5;
+            for (let i = 0; i <= 64; i++) {
+                const ang = (i / 64) * Math.PI * 2;
+                // 黄道上の3D位置 (赤道面からAXIS_TILT傾斜)
+                const x0 = R * Math.cos(ang);
+                const y0 = R * Math.sin(ang) * Math.sin(AXIS_TILT);
+                const z0 = R * Math.sin(ang) * Math.cos(AXIS_TILT);
+
+                const p = project({ x: x0, y: y0, z: z0 }, w, h);
+                if (i === 0) ctx2.moveTo(p.x, p.y);
+                else ctx2.lineTo(p.x, p.y);
+            }
+            ctx2.stroke();
+
+            // 5. 見かけの太陽（黄道上を移動）
+            const sunEclipticPos = {
+                x: R * Math.cos(lambda),
+                y: R * Math.sin(lambda) * Math.sin(AXIS_TILT),
+                z: R * Math.sin(lambda) * Math.cos(AXIS_TILT)
+            };
+            const sunP = project(sunEclipticPos, w, h);
+
+            // 太陽と中心（地球）の結び線
+            ctx2.beginPath();
+            ctx2.setLineDash([3, 3]);
+            ctx2.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+            ctx2.moveTo(earthP.x, earthP.y);
+            ctx2.lineTo(sunP.x, sunP.y);
+            ctx2.stroke();
+            ctx2.setLineDash([]);
+
+            // 太陽赤緯（赤道からの高さ線）
+            const projEquator = project({ x: sunEclipticPos.x, y: 0, z: sunEclipticPos.z }, w, h);
+            ctx2.beginPath();
+            ctx2.strokeStyle = '#ef4444';
+            ctx2.lineWidth = 1.5;
+            ctx2.moveTo(projEquator.x, projEquator.y);
+            ctx2.lineTo(sunP.x, sunP.y);
+            ctx2.stroke();
+
+            // 太陽本体
+            const sunGlow = ctx2.createRadialGradient(sunP.x, sunP.y, 2, sunP.x, sunP.y, 16 * sunP.scale);
+            sunGlow.addColorStop(0, '#fef08a');
+            sunGlow.addColorStop(0.5, '#fbbf24');
+            sunGlow.addColorStop(1, 'transparent');
+            ctx2.fillStyle = sunGlow;
+            ctx2.beginPath();
+            ctx2.arc(sunP.x, sunP.y, 16 * sunP.scale, 0, Math.PI * 2);
+            ctx2.fill();
+        }
+
+        // 基準グリッドの描画関数
+        function drawGrid(ctx, w, h, size, div) {
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            const step = size / div;
+            for (let i = -div; i <= div; i++) {
+                const p1 = project({ x: i * step, y: -20, z: -size }, w, h);
+                const p2 = project({ x: i * step, y: -20, z: size }, w, h);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+
+                const p3 = project({ x: -size, y: -20, z: i * step }, w, h);
+                const p4 = project({ x: size, y: -20, z: i * step }, w, h);
+                ctx.moveTo(p3.x, p3.y);
+                ctx.lineTo(p4.x, p4.y);
+            }
+            ctx.stroke();
+        }
+
+        // --- UI情報更新 ---
+        function updateUI(lambda, decDeg) {
+            // 日付計算 (1月1日〜12月31日)
+            const date = new Date(2026, 0, 1);
+            date.setDate(date.getDate() + currentDay);
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            dateDisplay.textContent = `${month}月${day}日`;
+
+            // 角度数値
+            const deg = Math.round((lambda * 180 / Math.PI) % 360);
+            orbitAngleVal.textContent = `${deg}°`;
+            declinationVal.textContent = `${decDeg > 0 ? '+' : ''}${decDeg}°`;
+
+            // 季節判別
+            if (currentDay >= 65 && currentDay < 120) seasonVal.textContent = "春（春分頃）";
+            else if (currentDay >= 120 && currentDay < 220) seasonVal.textContent = "夏（夏至頃）";
+            else if (currentDay >= 220 && currentDay < 300) seasonVal.textContent = "秋（秋分頃）";
+            else seasonVal.textContent = "冬（冬至頃）";
+        }
+
+        // --- イベント制御 ---
+        dateSlider.addEventListener('input', (e) => {
+            currentDay = parseInt(e.target.value);
+            render();
+        });
+
+        seasonBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentDay = parseInt(btn.dataset.day);
+                dateSlider.value = currentDay;
+                render();
+            });
+        });
+
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playBtn.textContent = '⏸ 一時停止';
+                playBtn.classList.add('active');
+                animate();
+            } else {
+                playBtn.textContent = '▶ 再生';
+                playBtn.classList.remove('active');
+                if (animFrameId) cancelAnimationFrame(animFrameId);
+            }
+        });
+
+        function animate() {
+            if (!isPlaying) return;
+            currentDay = (currentDay + 0.5) % 365;
+            dateSlider.value = Math.floor(currentDay);
+            render();
+            animFrameId = requestAnimationFrame(animate);
+        }
+
+        // 初期化実行
+        window.addEventListener('resize', resizeCanvases);
+        setTimeout(() => {
+            resizeCanvases();
+        }, 50);
+    </script>
+</body>
+</html>
